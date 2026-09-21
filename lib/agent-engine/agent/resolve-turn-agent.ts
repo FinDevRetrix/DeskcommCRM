@@ -60,6 +60,7 @@ import type pg from 'pg';
 
 import type { Logger } from '../obs/logger';
 import type { LlmEdgeConfig } from '../edge/llm/run-model-call';
+import { agenteDaCampanhaDaConversa } from './agente-da-campanha';
 import { loadActiveRouter } from './router-config';
 import {
   loadPublishedAgentConfig,
@@ -73,11 +74,22 @@ export interface TurnAgentResolution {
   routerId: string | null;
   intentName: string | null;
   confidence: number | null;
-  outcome: 'no_router' | 'classified' | 'sticky' | 'reclassified' | 'fallback' | 'no_match' | 'classifier_failed';
+  outcome:
+    | 'no_router'
+    | 'classified'
+    | 'sticky'
+    | 'reclassified'
+    | 'fallback'
+    | 'no_match'
+    | 'classifier_failed'
+    /** A conversa nasceu de uma campanha que declarou agente (migration 0267). */
+    | 'campanha';
 }
 
 export interface ResolveTurnAgentDeps {
   log: Logger;
+  /** Injetável para o teste não precisar de banco. */
+  agenteDaCampanha?: typeof agenteDaCampanhaDaConversa;
   loadActiveRouter?: typeof loadActiveRouter;
   loadPublishedAgentConfigById?: typeof loadPublishedAgentConfigById;
   loadPublishedAgentConfig?: typeof loadPublishedAgentConfig;
@@ -105,6 +117,28 @@ export async function resolveTurnAgent(
   const _classifyIntent = deps.classifyIntent ?? classifyIntent;
 
   try {
+    // ─── Degrau 0: a campanha que criou esta conversa ───
+    //
+    // ACIMA do roteador de propósito. O roteador é do NÚMERO e classifica
+    // assunto; a campanha é a razão de a conversa existir, e ela sabe algo que
+    // o classificador não tem como inferir: que esta pessoa está respondendo a
+    // uma abordagem, e que quem aborda segue outro roteiro.
+    //
+    // Falha ABERTA: agente da campanha sem versão publicada devolve `null` em
+    // `_loadAgentById`, e o turno segue pela régua normal em vez de calar.
+    const _agenteDaCampanha = deps.agenteDaCampanha ?? agenteDaCampanhaDaConversa;
+    const idDaCampanha = await _agenteDaCampanha(db, input.tenantId, input.conversationId);
+    if (idDaCampanha !== null) {
+      const config = await _loadAgentById(db, input.tenantId, idDaCampanha);
+      if (config !== null) {
+        return { config, routerId: null, intentName: null, confidence: null, outcome: 'campanha' };
+      }
+      deps.log.warn('agente da campanha sem versão publicada; seguindo pela régua do número', {
+        tenantId: input.tenantId,
+        conversationId: input.conversationId,
+      });
+    }
+
     const router = await _loadActiveRouter(db, input.tenantId, input.channelSessionId);
     if (router === null) {
       return {
