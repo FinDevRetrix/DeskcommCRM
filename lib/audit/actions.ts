@@ -783,7 +783,7 @@ export const AUDIT_ACTIONS = [
   "external_db_connection.deleted",
   "external_db_connection.tested",
   "external_db_connection.read",
-  // Campanhas (migration 0343). Toda mudança de ESTADO da campanha audita: são
+  // Campanhas (migration 0375). Toda mudança de ESTADO da campanha audita: são
   // as ações que fazem mensagem sair para gente que não pediu, e "quem mandou
   // isso, e quando?" precisa de resposta. Edição de rascunho não audita — não
   // saiu nada dela.
@@ -799,7 +799,7 @@ export const AUDIT_ACTIONS = [
   // Rodada do cron que MEXEU em alguma campanha (enviou, pulou, concluiu,
   // promoveu agendada). Rodada vazia não audita — o critério do `CLAUDE.md`.
   "cron.campaign_worker",
-  // Lista de exclusão da operação (migration 0344). Audita porque é decisão que
+  // Lista de exclusão da operação (migration 0376). Audita porque é decisão que
   // tira alguém de todo envio futuro — "quem tirou este número, e quando?"
   // precisa de resposta. O telefone NÃO entra no payload: só os últimos dígitos.
   "campaign.suppression_added",
