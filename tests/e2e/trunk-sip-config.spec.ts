@@ -139,8 +139,15 @@ test.describe("trunk SIP — permissão e conteúdo do bloco pjsip.conf", () => 
     expect(texto, "o bloco não declara um endpoint [nome]").toMatch(/^\[[^\]]+\]/);
 
     // ── QUALIDADE DE TELA ────────────────────────────────────────────────
+    // O BLOCO SAI DA VARREDURA, e não é conveniência: a guarda abaixo é sobre a
+    // CÓPIA da tela, e um arquivo `.conf` tem token pontuado em minúsculas por
+    // construção. Medido: `sufixo` é `Date.now().toString(36)`, então o host
+    // gerado (`sip-e2e-<sufixo>.invariant.test`) casa com o padrão de chave crua
+    // toda vez que o relógio devolve base36 só com letras — o caso reprovava por
+    // hora do dia, e passava na hora seguinte.
     const corpo = (await page.locator("body").innerText()).trim();
-    expect(corpo, "a tela mostra o que parece uma chave de tradução crua").not.toMatch(
+    const corpoSemOBloco = corpo.replace(texto, "").trim();
+    expect(corpoSemOBloco, "a tela mostra o que parece uma chave de tradução crua").not.toMatch(
       /\b[a-z]+(?:[._][a-z]+){2,}\b/,
     );
     expect(corpo).not.toMatch(/\{\{|\}\}|undefined|NaN|\[object Object\]/);
