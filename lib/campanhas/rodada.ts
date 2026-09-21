@@ -47,7 +47,12 @@ import { motivoParaExcluir, recusouMarketing } from "./elegibilidade";
 import { hashDoEndereco } from "./exclusoes";
 import { renderizar } from "./renderizador";
 import { escolherNumero, poolDaCampanha, type NumeroDisponivel } from "./rodizio";
-import { podeMandarAgora, proximaTentativa, type RitmoDaCampanha } from "./ritmo";
+import {
+  inicioDoDiaDaCampanha,
+  podeMandarAgora,
+  proximaTentativa,
+  type RitmoDaCampanha,
+} from "./ritmo";
 import { nomeDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { TEXTO_DA_EXCLUSAO } from "./tipos";
 
@@ -302,13 +307,17 @@ async function rodarUmaCampanha(
     tetoDiario: campanha.teto_diario,
     tetoHorario: campanha.teto_horario,
   };
-  const estado = await estadoDeEnvio(admin, campanha.id, agora);
-  const numeros = await numerosDaCampanha(admin, campanha);
   // O fuso da janela da campanha é o do número PRINCIPAL: ela é uma decisão da
   // campanha, e precisa de um relógio só — três números em fusos diferentes
   // fariam a mesma campanha abrir e fechar a janela três vezes.
+  //
+  // Carregado ANTES do estado de propósito: o teto DIÁRIO conta no mesmo fuso
+  // da janela, e não no dia UTC (ver `inicioDoDiaDaCampanha`).
   const knobsDoPrincipal = await loadChannelKnobs(pool, campanha.organization_id, campanha.channel_session_id);
-  const doRitmo = podeMandarAgora(ritmo, estado, agora, knobsDoPrincipal.knobs.timezone);
+  const fuso = knobsDoPrincipal.knobs.timezone;
+  const estado = await estadoDeEnvio(admin, campanha.id, agora, fuso);
+  const numeros = await numerosDaCampanha(admin, campanha);
+  const doRitmo = podeMandarAgora(ritmo, estado, agora, fuso);
   if (!doRitmo.pode) {
     // Espera não é falha: grava QUANDO tentar de novo para a fila não ser varrida
     // a cada tique por uma campanha que só volta amanhã.
@@ -575,9 +584,9 @@ async function estadoDeEnvio(
   admin: SupabaseClient,
   campanhaId: string,
   agora: Date,
+  fuso: string,
 ): Promise<{ ultimoEnvio: Date | null; enviadasHoje: number; enviadasNaUltimaHora: number }> {
-  const inicioDoDia = new Date(agora);
-  inicioDoDia.setUTCHours(0, 0, 0, 0);
+  const inicioDoDia = inicioDoDiaDaCampanha(agora, fuso);
   const { data } = await admin
     .from("campaign_recipients")
     .select("sent_at")

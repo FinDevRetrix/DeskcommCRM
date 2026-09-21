@@ -21,6 +21,8 @@
  * silêncio, e a mais cara quando erra.
  */
 
+import { dayStartInTz } from "@/lib/agent-engine/pacing/engine";
+
 import { horaNoFuso } from "./relogio";
 
 export interface RitmoDaCampanha {
@@ -38,6 +40,25 @@ export interface EstadoDoEnvio {
   enviadasHoje: number;
   /** Quantas desta campanha saíram na última hora corrida. */
   enviadasNaUltimaHora: number;
+}
+
+/**
+ * O começo do dia da campanha — no fuso do NÚMERO, nunca em UTC.
+ *
+ * `enviadasHoje`, acima, diz "no dia local de hoje", e o contador não cumpria
+ * isso: ele começava o dia na meia-noite UTC. Em `America/Sao_Paulo` (UTC-3) a
+ * meia-noite UTC é 21h LOCAL — dentro da janela padrão de 7h-22h —, então o
+ * teto zerava com uma hora de janela pela frente: uma campanha que já tinha
+ * batido `teto_diario` voltava a enviar às 21h e, na cadência de 1/min, mandava
+ * até ~60 mensagens além do que o operador configurou. O teto do CANAL (warm-up
+ * e `daily_message_limit`) continuava certo, então o número não ficava
+ * desprotegido; o que quebrava era o knob que o operador acreditava ter posto.
+ *
+ * Delega a `dayStartInTz`, que é a conta que o ritmo do canal já fazia. Dois
+ * relógios para o mesmo dia é exatamente como os dois lados voltam a discordar.
+ */
+export function inicioDoDiaDaCampanha(agora: Date, fuso: string): Date {
+  return dayStartInTz(agora, fuso);
 }
 
 export type MotivoDeEspera = "intervalo" | "fora_da_janela" | "teto_diario" | "teto_horario";

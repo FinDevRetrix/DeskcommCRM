@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { horaLocal, podeMandarAgora, proximaTentativa, type RitmoDaCampanha } from "./ritmo";
+import {
+  horaLocal,
+  inicioDoDiaDaCampanha,
+  podeMandarAgora,
+  proximaTentativa,
+  type RitmoDaCampanha,
+} from "./ritmo";
 
 const FUSO = "America/Sao_Paulo";
 /** 10h em São Paulo (UTC-3). */
@@ -105,5 +111,63 @@ describe("ritmo próprio da campanha", () => {
     expect(intervalo.getTime()).toBeGreaterThan(agora.getTime());
     // Quem espera a janela não precisa ser reconsultado de minuto em minuto.
     expect(janela.getTime()).toBeGreaterThan(intervalo.getTime());
+  });
+});
+
+describe("o dia do teto diário é o dia do CLIENTE, não o dia UTC", () => {
+  // 21h30 em São Paulo (UTC-3) é 00h30 do dia seguinte em UTC. É o instante
+  // exato do defeito: o dia UTC já virou, o dia local não, e a janela de
+  // 7h-22h ainda está aberta — sobra meia hora de envio.
+  const VINTE_E_UMA_E_MEIA = new Date("2026-09-19T00:30:00.000Z");
+  const JANELA_E_TETO: RitmoDaCampanha = {
+    intervaloSegundos: null,
+    janelaInicioHora: 7,
+    janelaFimHora: 22,
+    tetoDiario: 100,
+    tetoHorario: null,
+  };
+
+  /** O que a rodada faz: conta o que saiu desde o começo do dia e pergunta ao ritmo. */
+  function vetoDaRodada(envios: Date[], agora: Date, fuso: string) {
+    const inicio = inicioDoDiaDaCampanha(agora, fuso);
+    const hoje = envios.filter((d) => d.getTime() >= inicio.getTime());
+    return podeMandarAgora(
+      JANELA_E_TETO,
+      { ultimoEnvio: hoje[hoje.length - 1] ?? null, enviadasHoje: hoje.length, enviadasNaUltimaHora: 0 },
+      agora,
+      fuso,
+    );
+  }
+
+  it("às 21h30 o dia local ainda não virou: o começo do dia é 00h LOCAL, não a meia-noite UTC", () => {
+    // 2026-09-19T00:30Z é 18/09 às 21h30 em São Paulo ⇒ o dia começou
+    // em 18/09 00h local = 2026-09-18T03:00Z. A meia-noite UTC do
+    // instante (2026-09-19T00:00Z) é 30 minutos ATRÁS — dentro do dia local.
+    expect(inicioDoDiaDaCampanha(VINTE_E_UMA_E_MEIA, FUSO).toISOString()).toBe(
+      "2026-09-18T03:00:00.000Z",
+    );
+  });
+
+  it("uma campanha que bateu o teto diário NÃO volta a enviar às 21h30", () => {
+    // 100 envios ao longo do dia local de 18/09, o último às 20h (23h UTC),
+    // todos ANTES da meia-noite UTC — é isso que o contador em UTC perde.
+    const envios = Array.from(
+      { length: 100 },
+      (_, i) => new Date(Date.UTC(2026, 8, 18, 13, 0, 0) + i * 60_000),
+    );
+    const veto = vetoDaRodada(envios, VINTE_E_UMA_E_MEIA, FUSO);
+
+    expect(veto.pode).toBe(false);
+    if (!veto.pode) expect(veto.motivo).toBe("teto_diario");
+  });
+
+  it("no dia local SEGUINTE o teto realmente zera — o conserto não trava a campanha para sempre", () => {
+    const envios = Array.from(
+      { length: 100 },
+      (_, i) => new Date(Date.UTC(2026, 8, 18, 13, 0, 0) + i * 60_000),
+    );
+    // 19/09 às 10h em São Paulo: dia local novo, teto zerado.
+    const amanha = new Date("2026-09-19T13:00:00.000Z");
+    expect(vetoDaRodada(envios, amanha, FUSO)).toEqual({ pode: true });
   });
 });
