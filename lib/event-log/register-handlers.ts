@@ -1,4 +1,5 @@
 import { followupGatilhoPresencaHandler } from "@/lib/followup/gatilho-presenca.handler";
+import { followupGatilhoRetornoHandler } from "@/lib/followup/gatilho-retorno.handler";
 /**
  * Centralised handler registration for the event_log dispatcher.
  *
@@ -30,6 +31,7 @@ export function ensureHandlersRegistered(): void {
   // Follow-up de inbound ANTES do LLM: no Hobby o drain da mensagem
   // estourava no worker de IA e o match_reply nunca lia a resposta.
   registerHandler(followupReactivityHandler);
+  registerHandler(followupGatilhoRetornoHandler);
   registerHandler(aiResponseHandler);
   registerHandler(aiSentimentHandler);
   registerHandler(aiHandoffFromSentimentHandler);

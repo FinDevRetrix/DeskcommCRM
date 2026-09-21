@@ -50,7 +50,7 @@ import { EdgeConfigPanel } from "./EdgeConfigPanel";
 import { EtapasDoFluxoProvider, useEtapasDoFluxo } from "./EtapasDoFluxo";
 import { NodePalette } from "./NodePalette";
 import { PublishBar } from "./PublishBar";
-import { NODE_VISUALS } from "./nodes/nodeVisuals";
+import { NODE_VISUALS, configPadraoDaAcao } from "./nodes/nodeVisuals";
 import { TriggerNode } from "./nodes/TriggerNode";
 import { WaitNode } from "./nodes/WaitNode";
 import { ConditionNode } from "./nodes/ConditionNode";
@@ -217,15 +217,18 @@ function FlowCanvasInner({ flowId, initialData }: Props) {
     (type: NodeType, position: { x: number; y: number }) => {
       const visual = NODE_VISUALS[type];
       const id = `${type}-${nextId.current++}`;
+      const triggerKind =
+        typeof flow?.trigger_config?.kind === "string" ? flow.trigger_config.kind : undefined;
+      const config = type === "action" ? configPadraoDaAcao(triggerKind) : visual.defaultConfig();
       const newNode: RFNode = {
         id,
         type,
         position,
-        data: { label: t(visual.defaultLabel), config: visual.defaultConfig() },
+        data: { label: t(visual.defaultLabel), config },
       };
       setNodes((nds) => nds.concat(newNode));
     },
-    [setNodes, t],
+    [setNodes, t, flow?.trigger_config],
   );
 
   const onPaletteAdd = useCallback(

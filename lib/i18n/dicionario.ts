@@ -1743,6 +1743,16 @@ export const DICIONARIO: Traducoes = {
   "Não consegui criar o fluxo. Tente de novo.": {
     es: "No pude crear el flujo. Intenta de nuevo.",
   },
+  "Não consegui renomear o fluxo. Tente de novo.": {
+    es: "No pude renombrar el flujo. Intenta de nuevo.",
+  },
+  "Renomear fluxo": { es: "Renombrar flujo" },
+  "Só o nome interno muda. Inscrições e a versão publicada continuam as mesmas.": {
+    es: "Solo cambia el nombre interno. Las inscripciones y la versión publicada siguen iguales.",
+  },
+  "Duplicando…": { es: "Duplicando…" },
+  "Fluxo duplicado.": { es: "Flujo duplicado." },
+  "Fluxo renomeado.": { es: "Flujo renombrado." },
   "Novo fluxo de follow-up": { es: "Nuevo flujo de seguimiento" },
   "Nasce como rascunho. Você monta as etapas no editor visual em seguida.": {
     es: "Nace como borrador. Armas las etapas en el editor visual después.",
@@ -1937,6 +1947,13 @@ export const DICIONARIO: Traducoes = {
   "entrou em": { es: "entró en" },
   em: { es: "en" },
   "Agente pediu ajuda": { es: "El agente pidió ayuda" },
+  "Cliente voltou": { es: "El cliente volvió" },
+  "Tempo sem o cliente falar": { es: "Tiempo sin que el cliente hable" },
+  minuto: { es: "minuto" },
+  "O fluxo começa quando o cliente escreve depois de ficar este tempo sem mandar mensagem. Não é o mesmo que silêncio: silêncio avisa enquanto ele some; este avisa quando ele volta.":
+    {
+      es: "El flujo empieza cuando el cliente escribe después de estar este tiempo sin mandar mensaje. No es lo mismo que el silencio: el silencio avisa mientras desaparece; este avisa cuando vuelve.",
+    },
   "quando o agente pede ajuda": { es: "cuando el agente pide ayuda" },
   Manual: { es: "Manual" },
   "indisponível": { es: "no disponible" },

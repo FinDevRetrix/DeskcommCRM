@@ -137,6 +137,8 @@ describe("reatividade — quem não dorme segue igual (não-regressão)", () => 
 
     expect(s.reacted).toBe(1);
     expect(espiao.eventos.map((e) => e.event_type)).toContain("inbound_woke");
+    expect(espiao.patches[0]?.patch.updated_at).toBeUndefined();
+    expect(espiao.patches[0]?.patch.next_eval_at).toBeDefined();
   });
 
   it("espera comum com `cancel_on_reply` é cancelada", async () => {
@@ -162,6 +164,24 @@ describe("reatividade — quem não dorme segue igual (não-regressão)", () => 
 
     expect(s.reacted).toBe(1);
     expect(espiao.eventos.every((e) => e.enrollment_id === "enr-anda")).toBe(true);
+  });
+
+  it("não acorda espera estacionada depois da mensagem", async () => {
+    const { db, espiao } = montarDb([
+      inscricao({
+        status: "waiting_reply",
+        updated_at: "2026-09-20T19:35:47.000Z",
+      }),
+    ]);
+
+    const s = await applyReactivityEvent(db, () => new Date(AGORA), {
+      ...eventoDeInbound(),
+      created_at: "2026-09-20T19:35:45.000Z",
+    });
+
+    expect(s.reacted).toBe(0);
+    expect(espiao.eventos).toEqual([]);
+    expect(espiao.patches).toEqual([]);
   });
 });
 
