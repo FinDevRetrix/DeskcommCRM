@@ -10,6 +10,7 @@ const CONTATO = "22222222-2222-4222-8222-222222222222";
 const CONVERSA = "33333333-3333-4333-8333-333333333333";
 const MSG = "44444444-4444-4444-8444-444444444444";
 const POINTER = "55555555-5555-4555-8555-555555555555";
+const VERSAO = "66666666-6666-4666-8666-666666666666";
 const AGORA = new Date("2026-09-20T12:00:00.000Z");
 
 const pedido = {
@@ -34,9 +35,48 @@ const pointerQualifica = {
   rows: [
     {
       id: POINTER,
+      active_version_id: VERSAO,
       trigger_config: { kind: "inbound_after_silence", params: { threshold_minutes: 1440 } },
     },
   ],
+};
+
+const NO_DE_GATILHO = {
+  id: "t",
+  type: "trigger",
+  label: "Cliente voltou",
+  position: { x: 0, y: 0 },
+  config: {},
+};
+
+function grafoPublicado(no: Record<string, unknown>) {
+  return {
+    match: (sql: string) => sql.includes("followup_flow_versions"),
+    rows: [{ id: VERSAO, graph: { nodes: [NO_DE_GATILHO, no], edges: [] } }],
+  };
+}
+
+/** Texto fixo: o produtor enrolla mesmo sem nenhum agente armando o ponteiro. */
+const grafoDeTextoFixo = grafoPublicado({
+  id: "a",
+  type: "action",
+  label: "Aviso",
+  position: { x: 0, y: 120 },
+  config: { mode: "text", body: "Oi! Vi que você sumiu." },
+});
+
+/** Pede IA: sem agente armando, o produtor BARRA — o agente segue falando. */
+const grafoQuePedeIa = grafoPublicado({
+  id: "a",
+  type: "action",
+  label: "Resposta da IA",
+  position: { x: 0, y: 120 },
+  config: { mode: "ai_message", prompt_hint: "retome a conversa" },
+});
+
+const ninguemArma = {
+  match: (sql: string) => sql.includes("ai_agent_versions"),
+  rows: [],
 };
 
 const conversaLivre = {
@@ -85,7 +125,7 @@ describe("deveCederTurnoAoRetorno", () => {
   it("gap qualifica, gate arma, ninguém vivo: cede o turno", async () => {
     expect(
       await deveCederTurnoAoRetorno(
-        pool([pointerQualifica, conversaLivre, semVivo, inboundOntem, agenteArma]),
+        pool([pointerQualifica, conversaLivre, semVivo, inboundOntem, agenteArma, grafoDeTextoFixo]),
         pedido,
       ),
     ).toBe(true);
@@ -100,7 +140,26 @@ describe("deveCederTurnoAoRetorno", () => {
           semVivo,
           { match: (sql: string) => sql.includes("from messages"), rows: [] },
           agenteArma,
+          grafoDeTextoFixo,
         ]),
+        pedido,
+      ),
+    ).toBe(false);
+  });
+
+  it("fluxo de texto fixo sem agente armado: cede o turno — o produtor enrollaria", async () => {
+    expect(
+      await deveCederTurnoAoRetorno(
+        pool([pointerQualifica, conversaLivre, semVivo, inboundOntem, ninguemArma, grafoDeTextoFixo]),
+        pedido,
+      ),
+    ).toBe(true);
+  });
+
+  it("fluxo que pede IA sem agente armado não cede — o produtor barra esse enroll", async () => {
+    expect(
+      await deveCederTurnoAoRetorno(
+        pool([pointerQualifica, conversaLivre, semVivo, inboundOntem, ninguemArma, grafoQuePedeIa]),
         pedido,
       ),
     ).toBe(false);
@@ -115,6 +174,7 @@ describe("deveCederTurnoAoRetorno", () => {
           { match: (sql: string) => sql.includes("followup_enrollments"), rows: [{ pointer_id: "outro" }] },
           inboundOntem,
           agenteArma,
+          grafoDeTextoFixo,
         ]),
         pedido,
       ),

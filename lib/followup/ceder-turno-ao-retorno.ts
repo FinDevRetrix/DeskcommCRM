@@ -12,10 +12,19 @@
  * O predicado do buraco é o mesmo do produtor (`gapQualificaRetorno`). O
  * resto (humano, segmento, gate, slot vivo) também: pular o turno quando o
  * enroll NÃO aconteceria calaria o agente à toa.
+ *
+ * ⚠️ O gate do agente é `agenteDoGatilhoAutomatico` — a MESMA função que o
+ * produtor chama, alimentada pelo MESMO `fluxoPedeAgente` do grafo publicado.
+ * Perguntar só "algum agente arma este ponteiro?" é o gate ERRADO: fluxo de
+ * texto fixo enrolla sem agente nenhum, e o silenciador que não sabe disso
+ * deixa o LLM responder por cima da primeira mensagem do fluxo — as duas
+ * vozes no mesmo retorno que este arquivo existe para evitar.
  */
 import type pg from "pg";
 
+import { agenteDoGatilhoAutomatico, noDeGatilhoDoGrafo } from "./agent-followup-gate";
 import { triggerConfigSchema } from "./api-schemas";
+import { flowGraphSchema } from "./graph-schema";
 import { gapQualificaRetorno, segmentoCasa } from "./gap-de-retorno";
 import { humanoNoComando, type EstadoDaConversaDeRetorno } from "./gatilho-retorno";
 
@@ -29,6 +38,7 @@ export interface PedidoDeCessao {
 
 interface PointerArmado {
   id: string;
+  active_version_id: string;
   threshold_minutes: number;
   segments: string[];
 }
@@ -48,9 +58,10 @@ export async function deveCederTurnoAoRetorno(
   try {
     const { rows: pointerRows } = await pool.query<{
       id: string;
+      active_version_id: string;
       trigger_config: unknown;
     }>(
-      `select id, trigger_config
+      `select id, active_version_id, trigger_config
          from followup_flow_pointers
         where organization_id = $1
           and status = 'active'
@@ -64,6 +75,7 @@ export async function deveCederTurnoAoRetorno(
       if (!parsed.success || parsed.data.kind !== "inbound_after_silence") continue;
       pointers.push({
         id: row.id,
+        active_version_id: row.active_version_id,
         threshold_minutes: parsed.data.params.threshold_minutes,
         segments: parsed.data.params.segments ?? [],
       });
@@ -120,6 +132,19 @@ export async function deveCederTurnoAoRetorno(
     const anterior = rawAt ? new Date(rawAt) : null;
     if (anterior && Number.isNaN(anterior.getTime())) return false;
 
+    const { rows: grafos } = await pool.query<{ id: string; graph: unknown }>(
+      `select id, graph from followup_flow_versions
+        where organization_id = $1 and id = any($2::uuid[])`,
+      [pedido.organizationId, [...new Set(pointers.map((p) => p.active_version_id))]],
+    );
+    const pedeAgentePorVersao = new Map<string, boolean>();
+    for (const row of grafos) {
+      const parsed = flowGraphSchema.safeParse(row.graph);
+      if (!parsed.success) continue;
+      const no = noDeGatilhoDoGrafo(parsed.data);
+      if (no) pedeAgentePorVersao.set(row.id, no.pedeAgente);
+    }
+
     const { rows: versoes } = await pool.query<{
       agent_id: string;
       followup: { enabled?: unknown; flow_pointer_ids?: unknown } | null;
@@ -128,19 +153,28 @@ export async function deveCederTurnoAoRetorno(
         where organization_id = $1 and status = 'published'`,
       [pedido.organizationId],
     );
-    const pointerIdsArmados = new Set<string>();
+    // Qual agente arma cada ponteiro. O gate só lê "é nulo ou não", então não
+    // repito o desempate por menor uuid que o produtor faz para PINAR o agente.
+    const agentePorPointer = new Map<string, string>();
     for (const v of versoes) {
       const f = v.followup;
       if (!f || f.enabled !== true || !Array.isArray(f.flow_pointer_ids)) continue;
       for (const id of f.flow_pointer_ids) {
-        if (typeof id === "string") pointerIdsArmados.add(id);
+        if (typeof id === "string" && !agentePorPointer.has(id)) agentePorPointer.set(id, v.agent_id);
       }
     }
 
     for (const pointer of pointers) {
       if (!gapQualificaRetorno(anterior, agora, pointer.threshold_minutes)) continue;
       if (!segmentoCasa(pointer.segments, estado.tags)) continue;
-      if (!pointerIdsArmados.has(pointer.id)) continue;
+      // Grafo ilegível ou sem nó de gatilho: o produtor também não enrolla.
+      const pedeAgente = pedeAgentePorVersao.get(pointer.active_version_id);
+      if (pedeAgente === undefined) continue;
+      const { barrado } = agenteDoGatilhoAutomatico(
+        agentePorPointer.get(pointer.id) ?? null,
+        pedeAgente,
+      );
+      if (barrado) continue;
       return true;
     }
     return false;
