@@ -45,17 +45,31 @@ type ProvisionOptions = {
  * Service role, como o resto do provisionamento: quem ainda não pertence a
  * organização nenhuma não enxerga `user_organizations` por RLS. O `user_id`
  * vem sempre do JWT já validado, nunca do corpo de uma requisição.
+ *
+ * ⚠️ LANÇA quando a consulta falha, e isso é a decisão, não descuido — a mesma
+ * de `vinculoVivo` neste arquivo. Erro de leitura devolve `data: null`, que
+ * `data?.organization_id ?? null` converteria no MESMO `null` de "não pertence
+ * a organização nenhuma". Os dois desfechos são opostos: numa instalação
+ * `so_convite`, um soluço de leitura expulsaria de casa quem já é membro
+ * (`/login?error=cadastro_por_convite`), e numa instalação aberta faria
+ * `ensureTenantForUser` abrir uma segunda empresa para quem já tem a dele.
+ * "Não consegui ler" não é "não há vínculo"; quem chama decide o que fazer com
+ * o throw, e o `/auth/callback` falha FECHADO.
  */
 export async function vinculoAtivo(userId: string): Promise<string | null> {
   const admin = createAdminClient();
 
-  const { data } = await admin
+  const { data, error } = await admin
     .from("user_organizations")
     .select("organization_id")
     .eq("user_id", userId)
     .is("revoked_at", null)
     .limit(1)
     .maybeSingle();
+
+  if (error) {
+    throw new Error(`provisioning: busca do vínculo ativo falhou: ${error.message}`);
+  }
 
   return data?.organization_id ?? null;
 }

@@ -5,7 +5,7 @@ titulo: Entrar com o Google, sem senha, nas telas de entrar e de criar conta
 ---
 
 Quem usa Google Workspace já não precisa criar mais uma senha para começar:
-as telas de entrar e de criar conta ganharam o botão **Entrar com Google**. Ele
+as telas de entrar e de criar conta ganharam o botão **Continuar com Google**. Ele
 funciona nos dois sentidos — entra quem já tem conta e cria a conta quem não
 tem —, sem tela intermediária e sem pedir confirmação por e-mail.
 

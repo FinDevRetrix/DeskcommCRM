@@ -7,7 +7,16 @@ import { Button } from "@/components/ui/button";
 import { signInWithGoogle } from "@/app/actions/auth/signInWithGoogle";
 
 /**
- * O botão "Entrar com Google" — o mesmo no login e no cadastro.
+ * O botão "Continuar com Google" — o mesmo no login e no cadastro.
+ *
+ * ⚠️ O RÓTULO NÃO PODE COMEÇAR COM "Entrar". Não é gosto: 107 arquivos de
+ * `tests/e2e` logam com `getByRole("button", { name: /entrar/i })`, e o
+ * Playwright falha em STRICT MODE quando um locator resolve a dois elementos.
+ * Com "Entrar com Google" na tela de login, o helper de login da suíte para de
+ * funcionar e TODA spec cai antes da primeira asserção — medido no run
+ * 35537469070: 316 das 317 mensagens `Error:` eram essa colisão.
+ * "Continuar" também é a palavra mais correta: o mesmo botão CRIA conta na tela
+ * de cadastro. Preso por `EntrarComGoogle.rotulo.test.tsx`.
  *
  * O cadastro passa `convite` porque a volta não tem como saber que a pessoa
  * veio de um convite: o Google não devolve nada nosso além do que pusermos na
@@ -61,7 +70,7 @@ export function EntrarComGoogle({ next, convite }: { next?: string; convite?: st
         disabled={isPending}
         onClick={onClick}
       >
-        {isPending ? t("Abrindo o Google...") : t("Entrar com Google")}
+        {isPending ? t("Abrindo o Google...") : t("Continuar com Google")}
       </Button>
     </div>
   );

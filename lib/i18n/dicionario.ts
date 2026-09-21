@@ -10813,7 +10813,7 @@ export const DICIONARIO: Traducoes = {
 
   // ── Entrada com Google (issue #1388) ──────────────────────────────────────
   ou: { es: "o" },
-  "Entrar com Google": { es: "Entrar con Google" },
+  "Continuar com Google": { es: "Continuar con Google" },
   "Abrindo o Google...": { es: "Abriendo Google..." },
   "O Google não está habilitado nesta instalação. Entre com e-mail e senha, ou peça a quem administra para habilitá-lo.":
     {
@@ -10829,6 +10829,10 @@ export const DICIONARIO: Traducoes = {
   "A entrada com o Google foi cancelada antes de terminar. Nada mudou na sua conta.": {
     es: "La entrada con Google se canceló antes de terminar. Nada cambió en tu cuenta.",
   },
+  "Seu acesso a esta empresa foi retirado por quem a administra. Fale com essa pessoa para voltar — não criamos uma empresa nova no seu nome.":
+    {
+      es: "Tu acceso a esta empresa fue retirado por quien la administra. Habla con esa persona para volver — no creamos una empresa nueva a tu nombre.",
+    },
 
   // ─── Painel "Para integrar" (dados não-secretos da conexão) ───
   "Para integrar": { es: "Para integrar" },
@@ -10861,7 +10865,6 @@ export const DICIONARIO: Traducoes = {
   "Não compartilhe esta sessão.": { es: "No compartas esta sesión." },
   "Crie uma conexão separada por QR no outro sistema.": {
     es: "Crea una conexión separada por QR en el otro sistema.",
-
   },
 };
 

@@ -116,6 +116,22 @@ export default async function LoginPage({
           )}
         </div>
       )}
+      {/*
+        ACESSO RETIRADO NÃO É CONVITE INVÁLIDO. Quem teve o vínculo revogado e
+        volta pelo Google chega aqui sem organização — igual a quem nunca teve
+        uma. Dizer "convite expirou" mandaria a pessoa pedir um convite que
+        ninguém vai emitir, e esconderia o que de fato aconteceu com ela.
+      */}
+      {error === "acesso_revogado" && (
+        <div
+          className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+          role="alert"
+        >
+          {t(
+            "Seu acesso a esta empresa foi retirado por quem a administra. Fale com essa pessoa para voltar — não criamos uma empresa nova no seu nome.",
+          )}
+        </div>
+      )}
       {error === "entrada_com_google_cancelada" && (
         <div
           className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"

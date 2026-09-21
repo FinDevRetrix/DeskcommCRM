@@ -6,7 +6,9 @@ import { decidirConviteDoSignup } from "@/lib/auth/convite-no-signup";
 import { modoDeCadastro } from "@/lib/auth/politica-de-cadastro";
 import { aplicarConvite } from "@/lib/auth/aplicar-convite";
 import { safeNext } from "@/lib/auth/safe-next";
+import { acessoFoiRevogado } from "@/lib/auth/vinculo-revogado";
 import { audit } from "@/lib/audit";
+import { logger } from "@/lib/logger";
 import { env } from "@/lib/env";
 
 /**
@@ -67,20 +69,12 @@ export async function GET(request: NextRequest) {
   // tela de login ficaria em branco, sem dizer nada.
   const erroDoProvedor = url.searchParams.get("error");
   if (erroDoProvedor) {
-    await audit({
-      action: "auth.google_signin_failed",
-      metadata: { motivo: "recusado_no_provedor", reason: erroDoProvedor },
-      requestId,
-    });
+    falhaAnonima("recusado_no_provedor", erroDoProvedor);
     return redirectTo("/login?error=entrada_com_google_cancelada");
   }
 
   if (!code) {
-    await audit({
-      action: "auth.google_signin_failed",
-      metadata: { motivo: "sem_code" },
-      requestId,
-    });
+    falhaAnonima("sem_code");
     return redirectTo("/login?error=entrada_com_google");
   }
 
@@ -90,11 +84,7 @@ export async function GET(request: NextRequest) {
   const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
   if (error || !data?.user) {
-    await audit({
-      action: "auth.google_signin_failed",
-      metadata: { motivo: "troca_do_code_falhou", reason: error?.message ?? "no_user" },
-      requestId,
-    });
+    falhaAnonima("troca_do_code_falhou", error?.message ?? "no_user");
     return redirectTo("/login?error=entrada_com_google");
   }
 
@@ -115,7 +105,27 @@ export async function GET(request: NextRequest) {
   // ENTRADA: já existe vínculo. Provisionar ou reaplicar convite aqui seria
   // refazer trabalho que já está feito — e recusar pelo modo de cadastro
   // trancaria do lado de fora quem já é de casa.
-  const organizacaoId = await vinculoAtivo(usuario.id);
+  let organizacaoId: string | null;
+  try {
+    organizacaoId = await vinculoAtivo(usuario.id);
+  } catch (e) {
+    // FALHA FECHADA. `vinculoAtivo` lança quando não CONSEGUIU ler, e seguir
+    // daqui trataria "não consegui ler" como "não tem vínculo" — o que manda
+    // um membro de casa para a trava de cadastro, ou abre uma segunda empresa
+    // para quem já tem a dele. A sessão fica firmada; a pessoa tenta de novo.
+    await audit({
+      action: "auth.google_signin_failed",
+      actorUserId: usuario.id,
+      metadata: {
+        motivo: "vinculo_ilegivel",
+        reason: e instanceof Error ? e.message : String(e),
+        provider: "google",
+      },
+      requestId,
+    });
+    return redirectTo("/login?error=entrada_com_google");
+  }
+
   if (organizacaoId) {
     await audit({
       action: "auth.login_success",
@@ -124,6 +134,28 @@ export async function GET(request: NextRequest) {
       requestId,
     });
     return redirectTo(safeNext(next, "/app"));
+  }
+
+  // QUEM PERDEU O ACESSO NÃO É UM VISITANTE NOVO — e sem esta guarda era
+  // tratado como um. `vinculoAtivo` filtra `.is("revoked_at", null)`, então
+  // para o revogado ele devolve o MESMO `null` de quem nunca teve empresa; o
+  // caminho de baixo então provisiona e grava `role: "admin"`. Revogar alguém
+  // lhe daria, na prática, um tenant próprio dentro da mesma instalação — o
+  // mesmo buraco que `recoverOrganization.ts:86` já fecha na outra porta, com
+  // esta chamada nesta mesma posição.
+  //
+  // A POSIÇÃO É LOAD-BEARING: antes de `decidirConviteDoSignup`. Depois dela,
+  // o revogado sem convite sairia auditado como `convite_invalido` — que não é
+  // a verdade sobre o que aconteceu com ele, e é exatamente a mentira que o
+  // cabeçalho de `lib/auth/vinculo-revogado.ts` foi escrito para acabar.
+  if (await acessoFoiRevogado(usuario.id)) {
+    await audit({
+      action: "auth.signup_provision_recusado",
+      actorUserId: usuario.id,
+      metadata: { motivo: "acesso_revogado", provider: "google" },
+      requestId,
+    });
+    return redirectTo("/login?error=acesso_revogado");
   }
 
   // CADASTRO: sem vínculo, este é um primeiro acesso. Daqui para baixo é o
@@ -189,4 +221,32 @@ export async function GET(request: NextRequest) {
   });
 
   return redirectTo("/onboarding/welcome");
+}
+
+/**
+ * As falhas que acontecem ANTES de haver identidade vão para o log, não para o
+ * `api_audit_log`.
+ *
+ * `/auth/callback` está em `PUBLIC_PATHS` porque tem de estar (o cookie de
+ * sessão é `sameSite: "strict"` e não viaja na volta do Google). Auditar nos
+ * ramos de cima dava a QUALQUER anônimo uma escrita ilimitada numa tabela
+ * append-only, com piso de expurgo de 90 dias, numa VPS com cota de disco — e
+ * o `reason` ia cru, com o texto que quem chamou escolheu. Medido pela revisão
+ * deste PR: `GET /auth/callback?error=<4000 chars>` gravava uma linha com
+ * 4.045 bytes de metadata, uma por requisição.
+ *
+ * A doutrina já estava escrita no irmão desta rota
+ * (`app/api/v1/agenda/google/callback/route.ts:188-191`): não se audita antes
+ * de um gate. Aqui o gate é a troca do `code` por sessão — passou dela, há
+ * pessoa, e daí para baixo tudo audita. O sinal não se perde: o operador o lê
+ * no log do contêiner, que rotaciona, em vez de no banco, que não.
+ *
+ * O `reason` vai truncado de qualquer forma: linha de log de tamanho escolhido
+ * por quem chama enche disco do mesmo jeito, só mais devagar.
+ */
+function falhaAnonima(motivo: string, reason?: string): void {
+  logger.warn("auth.google_signin_failed", {
+    motivo,
+    ...(reason ? { reason: reason.slice(0, 200) } : {}),
+  });
 }

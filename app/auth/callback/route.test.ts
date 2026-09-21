@@ -5,7 +5,9 @@ import { aplicarConvite } from "@/lib/auth/aplicar-convite";
 import { decidirConviteDoSignup } from "@/lib/auth/convite-no-signup";
 import { ensureTenantForUser, vinculoAtivo } from "@/lib/auth/provision";
 import { modoDeCadastro } from "@/lib/auth/politica-de-cadastro";
+import { acessoFoiRevogado } from "@/lib/auth/vinculo-revogado";
 import { createClient } from "@/lib/supabase/server";
+import { audit } from "@/lib/audit";
 
 /**
  * GET /auth/callback — a volta da entrada com Google (issue #1388).
@@ -26,7 +28,11 @@ vi.mock("@/lib/auth/provision", () => ({
   vinculoAtivo: vi.fn(async () => null),
 }));
 vi.mock("@/lib/auth/politica-de-cadastro", () => ({ modoDeCadastro: vi.fn(async () => "aberto") }));
+vi.mock("@/lib/auth/vinculo-revogado", () => ({ acessoFoiRevogado: vi.fn(async () => false) }));
 vi.mock("@/lib/audit", () => ({ audit: vi.fn(async () => undefined) }));
+vi.mock("@/lib/logger", () => ({
+  logger: { warn: vi.fn(), info: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
 vi.mock("@/lib/env", () => ({ env: { NEXT_PUBLIC_APP_URL: "http://localhost:3000" } }));
 
 const USUARIO = { id: "11111111-1111-4111-8111-111111111111", email: "convidado@example.com" };
@@ -80,6 +86,7 @@ describe("GET /auth/callback", () => {
     vi.mocked(decidirConviteDoSignup).mockReturnValue({ tipo: "provisionar" });
     vi.mocked(vinculoAtivo).mockResolvedValue(null);
     vi.mocked(modoDeCadastro).mockResolvedValue("aberto");
+    vi.mocked(acessoFoiRevogado).mockResolvedValue(false);
   });
 
   it("conta nova com convite na URL: grava o vínculo e entra no app, sem empresa nova", async () => {
@@ -196,5 +203,70 @@ describe("GET /auth/callback", () => {
     const res = await GET(requisicao("code=abc"));
 
     expect(destino(res)).toBe("/get-started");
+  });
+
+  it("membro REVOGADO não vira dono de empresa nova — e o motivo auditado diz a verdade", async () => {
+    // `vinculoAtivo` filtra `.is("revoked_at", null)`, então para quem teve o
+    // acesso retirado ele devolve o MESMO `null` de quem nunca teve empresa.
+    // Sem a guarda, a rota classifica como primeiro acesso e
+    // `ensureTenantForUser` grava `role: "admin"`: revogar alguém lhe daria um
+    // tenant próprio dentro da mesma instalação.
+    const { GET } = await comSupabase({ troca: { data: { user: USUARIO }, error: null } });
+    vi.mocked(vinculoAtivo).mockResolvedValue(null);
+    vi.mocked(acessoFoiRevogado).mockResolvedValue(true);
+
+    const res = await GET(requisicao("code=abc"));
+
+    expect(vi.mocked(ensureTenantForUser)).not.toHaveBeenCalled();
+    expect(destino(res)).toBe("/login?error=acesso_revogado");
+    // A POSIÇÃO: antes de `decidirConviteDoSignup`. Fora dela o motivo sairia
+    // como `convite_invalido`, que não é o que aconteceu com esta pessoa.
+    expect(vi.mocked(decidirConviteDoSignup)).not.toHaveBeenCalled();
+    expect(vi.mocked(audit)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "auth.signup_provision_recusado",
+        actorUserId: USUARIO.id,
+        metadata: expect.objectContaining({ motivo: "acesso_revogado" }),
+      }),
+    );
+  });
+
+  it("quem tem vínculo ATIVO não é perguntado sobre revogação — entra direto", async () => {
+    // Controle negativo do caso acima: a guarda não pode virar pedágio de quem
+    // já é de casa.
+    const { GET } = await comSupabase({ troca: { data: { user: USUARIO }, error: null } });
+    vi.mocked(vinculoAtivo).mockResolvedValue("org-existente");
+
+    const res = await GET(requisicao("code=abc"));
+
+    expect(destino(res)).toBe("/app");
+    expect(vi.mocked(acessoFoiRevogado)).not.toHaveBeenCalled();
+  });
+
+  it("banco ilegível no vínculo: falha FECHADA, sem provisionar e sem expulsar de casa", async () => {
+    // `vinculoAtivo` lança quando não CONSEGUIU ler. Tratar isso como "não tem
+    // vínculo" mandaria um membro para a trava de cadastro numa instalação
+    // `so_convite`, ou abriria uma segunda empresa numa instalação aberta.
+    const { GET } = await comSupabase({ troca: { data: { user: USUARIO }, error: null } });
+    vi.mocked(vinculoAtivo).mockRejectedValueOnce(new Error("connection reset"));
+
+    const res = await GET(requisicao("code=abc"));
+
+    expect(destino(res)).toBe("/login?error=entrada_com_google");
+    expect(vi.mocked(ensureTenantForUser)).not.toHaveBeenCalled();
+    expect(vi.mocked(decidirConviteDoSignup)).not.toHaveBeenCalled();
+  });
+
+  it("anônimo não escreve no audit log: os ramos antes da troca do code não auditam", async () => {
+    // `/auth/callback` é público por necessidade (o cookie de sessão é
+    // `sameSite: "strict"` e não viaja na volta do Google). Auditar antes do
+    // gate dava a qualquer um escrita ilimitada numa tabela append-only com
+    // piso de expurgo de 90 dias — e com o texto cru de quem chamou dentro.
+    const { GET } = await comSupabase({ troca: { data: null, error: null } });
+
+    await GET(requisicao(`error=${"x".repeat(4000)}`));
+    await GET(requisicao(""));
+
+    expect(vi.mocked(audit)).not.toHaveBeenCalled();
   });
 });
