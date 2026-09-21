@@ -10810,6 +10810,26 @@ export const DICIONARIO: Traducoes = {
   "Esta conexão está desativada. Ative-a na lista para consultar os dados.": {
     es: "Esta conexión está desactivada. Actívala en la lista para consultar los datos.",
   },
+
+  // ── Entrada com Google (issue #1388) ──────────────────────────────────────
+  ou: { es: "o" },
+  "Entrar com Google": { es: "Entrar con Google" },
+  "Abrindo o Google...": { es: "Abriendo Google..." },
+  "O Google não está habilitado nesta instalação. Entre com e-mail e senha, ou peça a quem administra para habilitá-lo.":
+    {
+      es: "Google no está habilitado en esta instalación. Entra con correo y contraseña, o pídele a quien administra que lo habilite.",
+    },
+  "Não foi possível falar com o Google agora. Tente novamente em instantes.": {
+    es: "No se pudo hablar con Google ahora. Vuelve a intentarlo en unos instantes.",
+  },
+  "Não foi possível concluir a entrada com o Google. Tente novamente — se acontecer de novo, entre com e-mail e senha.":
+    {
+      es: "No se pudo completar la entrada con Google. Vuelve a intentarlo — si sucede otra vez, entra con correo y contraseña.",
+    },
+  "A entrada com o Google foi cancelada antes de terminar. Nada mudou na sua conta.": {
+    es: "La entrada con Google se canceló antes de terminar. Nada cambió en tu cuenta.",
+  },
+
   // ─── Painel "Para integrar" (dados não-secretos da conexão) ───
   "Para integrar": { es: "Para integrar" },
   "Copiar dados": { es: "Copiar datos" },
@@ -10841,6 +10861,7 @@ export const DICIONARIO: Traducoes = {
   "Não compartilhe esta sessão.": { es: "No compartas esta sesión." },
   "Crie uma conexão separada por QR no outro sistema.": {
     es: "Crea una conexión separada por QR en el otro sistema.",
+
   },
 };
 

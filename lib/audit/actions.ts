@@ -783,6 +783,17 @@ export const AUDIT_ACTIONS = [
   "external_db_connection.deleted",
   "external_db_connection.tested",
   "external_db_connection.read",
+
+  // ── Entrada com Google (issue #1388) ────────────────────────────────────
+  // UM código para as quatro recusas da volta do OAuth, com `motivo` no
+  // metadata: `recusado_no_provedor` (a pessoa fechou a tela do Google),
+  // `sem_code`, `troca_do_code_falhou` (o verificador de PKCE não voltou, o
+  // code já foi gasto, o relógio do GoTrue passou) e `provedor_indisponivel`
+  // (ninguém ligou o provedor Google no projeto). A pergunta de triagem é
+  // sempre a mesma — "por que a entrada com Google não fechou para esta
+  // pessoa?" —, e ela não precisa de quatro filtros no painel para ser
+  // respondida; o que precisa estar separado é a causa, e ela está.
+  "auth.google_signin_failed",
 ] as const;
 
 /** Um código de auditoria. Derivado de `AUDIT_ACTIONS` — não redigite a lista. */
