@@ -1,0 +1,343 @@
+/**
+ * Retrix — tema do fork (whitelabel visual do Central Retrix aplicado ao
+ * DeskcommCRM), MANTIDO SEPARADO de `app/globals.css` de propósito.
+ *
+ * ── Por que este arquivo existe, e por que ele não edita `globals.css` ───────
+ *
+ * O fork precisa continuar recebendo merge do upstream (DeskcommCRM) sem
+ * conflito constante. `globals.css` é o arquivo que o upstream mais mexe (é
+ * onde vive o design system "Sage" dele) — editá-lo linha a linha criaria
+ * conflito de merge a cada atualização. Este arquivo faz o oposto: ele só
+ * REDECLARA, por cima, as MESMAS custom properties que `globals.css` já
+ * declara em `:root` / `[data-theme="light"]` / `[data-theme="dark"]`. Não
+ * remove nada, não muda estrutura, não referencia seletor nenhum do upstream
+ * além dos três blocos de tema (que são o contrato público do design system).
+ *
+ * Importado em `app/layout.tsx` DEPOIS de `./globals.css` (uma linha só) —
+ * ver o comentário lá. Como os três blocos aqui são, como os de
+ * `globals.css`, declarações SEM `@layer`, e ambos os arquivos entram sem
+ * camada, o critério de desempate é ORDEM NO DOCUMENTO: a regra que vem por
+ * último, com a MESMA especificidade, vence. `:root` deste arquivo e `:root`
+ * de `globals.css` têm especificidade idêntica (0,1,0) — então basta vir
+ * depois.
+ *
+ * ── Por que a rampa `--color-accent-*` NÃO aparece aqui ──────────────────────
+ *
+ * O DeskcommCRM já tem whitelabel próprio: `APP_ACCENT_HEX` (ou
+ * `platform_branding.accent_hex` no banco, que tem precedência) entra por
+ * `lib/branding/rampa.ts` + `lib/branding/css.ts`, que deriva os 11 stops em
+ * OKLab e os injeta num `<style id="marca-instalacao">` com seletor
+ * `:root:root` / `:root:root[data-theme="dark"]` — especificidade (0,2,0),
+ * MAIOR que a de qualquer regra deste arquivo. Ou seja: mesmo que este
+ * arquivo tentasse pintar `--color-accent-*`, o sistema de marca já
+ * instalado venceria de qualquer forma. Em vez de competir com ele, este
+ * arquivo COOPERA: define `APP_ACCENT_HEX=#4b4ef0` (indigo Retrix — ver o
+ * relatório) e deixa a rampa inteira (accent, accent-hover, accent-soft,
+ * accent-fg, os 11 stops) para o sistema existente derivar. Este arquivo cuida
+ * só do que o whitelabel de cor não cobre: neutros, superfícies, texto,
+ * bordas, raio, sombra, fontes — e acrescenta o DOURADO (`--rx-gold-*`), que
+ * o DeskcommCRM não tem token nenhum para.
+ *
+ * ── Por que a barra lateral é tratada à parte, mais abaixo ───────────────────
+ *
+ * Custom property herdada é resolvida UMA VEZ no elemento mais alto que a
+ * declara e passada já pronta para baixo — um `<aside>` que não redeclara
+ * `--color-card`/`--color-muted-foreground`/`--color-accent` continuaria
+ * herdando o valor já resolvido em `:root`, e mudar só `--color-surface` no
+ * escopo do `<aside>` não teria efeito nenhum sobre `.bg-card` (que lê
+ * `--color-card`, resolvida uma vez lá em cima). Por isso a barra lateral é
+ * repintada com PROPRIEDADES TERMINAIS (`background`, `color`,
+ * `border-color`) em vez de tentar redeclarar variável — e, como este
+ * arquivo não usa `@layer`, essas regras vencem `@layer utilities` (onde
+ * moram as classes Tailwind `.bg-card`, `.text-muted-foreground` etc.)
+ * INDEPENDENTE de especificidade, pela mesma regra de cascata que já faz
+ * `lib/branding/css.ts` vencer sem `!important`.
+ */
+
+/* ============================================================
+   1) TOKENS DE BASE — claro (mapeia :root e [data-theme="light"] do CRM)
+   ============================================================ */
+:root,
+[data-theme="light"] {
+  /* Superfícies */
+  --color-bg: #f8f9fb; /* --surface-canvas do portal */
+  --color-surface: #ffffff; /* --surface-card */
+  --color-surface-elevated: #eef0f4; /* --surface-sunken */
+  --color-overlay: rgba(27, 32, 48, 0.42); /* neutral-900 @ 42% */
+
+  /* Texto */
+  --color-text: #1b2030; /* --text-primary */
+  --color-text-muted: #545e70; /* --text-secondary */
+  --color-text-subtle: #707a8c; /* --text-muted */
+
+  /* Bordas */
+  --color-border: #dde1e8; /* --border-default */
+  --color-border-strong: #c2c8d3; /* --border-strong */
+
+  /* Neutros (cinza frio Retrix, 11 stops) */
+  --color-neutral-50: #f8f9fb;
+  --color-neutral-100: #eef0f4;
+  --color-neutral-200: #dde1e8;
+  --color-neutral-300: #c2c8d3;
+  --color-neutral-400: #9aa3b2;
+  --color-neutral-500: #707a8c;
+  --color-neutral-600: #545e70;
+  --color-neutral-700: #3e4759;
+  --color-neutral-800: #2a3142;
+  --color-neutral-900: #1b2030;
+  --color-neutral-950: #14172033;
+
+  /* Semânticos (teal/âmbar/coral/índigo do Retrix — só cor, sem tocar
+     --color-accent-*, que é o whitelabel indigo já instalado) */
+  --color-success: #0ea5a0;
+  --color-success-bg: rgba(14, 165, 160, 0.12);
+  --color-success-fg: #0c8983;
+  --color-warning: #e8a33d;
+  --color-warning-bg: rgba(232, 163, 61, 0.12);
+  --color-warning-fg: #c6811f;
+  --color-error: #e8654a;
+  --color-error-bg: rgba(232, 101, 74, 0.12);
+  --color-error-fg: #c94a31;
+  --color-info: #6e76ff;
+  --color-info-bg: rgba(110, 118, 255, 0.12);
+  --color-info-fg: #4b4ef0;
+
+  /* Sombra — tingida de indigo, como o Central Retrix */
+  --shadow-xs: 0 1px 2px 0 rgba(20, 17, 79, 0.05);
+  --shadow-sm: 0 1px 2px 0 rgba(20, 17, 79, 0.06), 0 1px 1px 0 rgba(20, 17, 79, 0.04);
+  --shadow-md: 0 4px 12px -2px rgba(20, 17, 79, 0.1), 0 2px 4px -1px rgba(20, 17, 79, 0.06);
+  --shadow-lg: 0 12px 32px -6px rgba(20, 17, 79, 0.16), 0 4px 12px -2px rgba(20, 17, 79, 0.1);
+  --shadow-xl: 0 24px 48px -12px rgba(20, 17, 79, 0.22), 0 8px 16px -4px rgba(20, 17, 79, 0.12);
+
+  /* Raio — cantos discretos do Central Retrix (s 6 / m 10 / l 16 / xl 22) */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+  --radius-full: 999px;
+
+  /* Dourado — assinatura Retrix. O CRM não tem token equivalente; nasce aqui. */
+  --rx-gold: #bd985d;
+  --rx-gold-hover: #9c7b45;
+  --rx-gold-soft: rgba(189, 152, 93, 0.16);
+
+  /* Tipografia — mesma pilha do portal (Inter/Poppins/IBM Plex Mono), sem
+     carregar webfont (o portal também não carrega — ver theme.css dele):
+     em quem não tem Inter instalada, cai para o `system-ui` da pilha, IGUAL
+     ao portal. É isto que faz os dois lerem como a mesma família sem exigir
+     nova dependência de fonte no fork. */
+  --font-body:
+    "Inter", system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial,
+    sans-serif;
+  --font-display: "Poppins", var(--font-body);
+  --rx-font-mono:
+    "IBM Plex Mono", ui-monospace, "SF Mono", "Segoe UI Mono", monospace;
+
+  --ease-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+}
+
+/* ============================================================
+   2) TOKENS DE BASE — escuro (mapeia [data-theme="dark"] do CRM)
+   ============================================================ */
+[data-theme="dark"] {
+  --color-bg: #0c0a2e; /* --surface-page do portal, escuro */
+  --color-surface: #17144a; /* --surface-card */
+  --color-surface-elevated: #1d1a58; /* --surface-card-2 */
+  --color-overlay: rgba(0, 0, 0, 0.55);
+
+  --color-text: #eef0ff;
+  --color-text-muted: rgba(222, 225, 255, 0.72);
+  --color-text-subtle: rgba(222, 225, 255, 0.5);
+
+  --color-border: rgba(255, 255, 255, 0.12);
+  --color-border-strong: rgba(255, 255, 255, 0.22);
+
+  --color-neutral-50: #eef0ff;
+  --color-neutral-100: rgba(222, 225, 255, 0.85);
+  --color-neutral-200: rgba(222, 225, 255, 0.6);
+  --color-neutral-300: rgba(222, 225, 255, 0.4);
+  --color-neutral-400: rgba(222, 225, 255, 0.28);
+  --color-neutral-500: rgba(222, 225, 255, 0.2);
+  --color-neutral-600: rgba(255, 255, 255, 0.16);
+  --color-neutral-700: rgba(255, 255, 255, 0.12);
+  --color-neutral-800: #1d1a58;
+  --color-neutral-900: #17144a;
+  --color-neutral-950: #100d38;
+
+  --color-success: #2fd6cf;
+  --color-success-bg: rgba(47, 214, 207, 0.16);
+  --color-success-fg: #2fd6cf;
+  --color-warning: #f0a429;
+  --color-warning-bg: rgba(240, 164, 41, 0.16);
+  --color-warning-fg: #f0a429;
+  --color-error: #f4586e;
+  --color-error-bg: rgba(244, 88, 110, 0.16);
+  --color-error-fg: #f4586e;
+  --color-info: #98a0ff;
+  --color-info-bg: rgba(152, 160, 255, 0.16);
+  --color-info-fg: #98a0ff;
+
+  --shadow-xs: 0 4px 16px rgba(0, 0, 0, 0.35);
+  --shadow-sm: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 16px 44px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 28px 80px rgba(0, 0, 0, 0.6);
+  --shadow-xl: 0 32px 96px rgba(0, 0, 0, 0.68);
+
+  --rx-gold: #e0bd81;
+  --rx-gold-hover: #ecdcb8;
+  --rx-gold-soft: rgba(224, 189, 129, 0.18);
+}
+
+/* ============================================================
+   3) FONTES — troca a pilha visual sem tocar nas chamadas next/font
+   ============================================================
+   `app/layout.tsx` carrega Atkinson Hyperlegible (`--font-atkinson`) e IBM
+   Plex Mono (`--font-mono`) via next/font e aplica as duas como className no
+   `<html>`. Não editamos essas chamadas: em vez de redeclarar
+   `--font-atkinson`/`--font-mono` (variável escrita pelo próprio next/font
+   direto no `<html>`, então concorreria por ordem/especificidade ali), a
+   troca acontece no PONTO DE CONSUMO — `body`, headings, `code/kbd/pre` — com
+   `font-family` direto. Como este arquivo não usa `@layer`, estas regras
+   vencem as equivalentes de `@layer base` em `globals.css` independente de
+   especificidade (mesma garantia que o bloco de marca já usa — ver o
+   cabeçalho deste arquivo). Resultado visual: Atkinson Hyperlegible deixa de
+   aparecer; body e headings leem Inter/Poppins, iguais ao portal. */
+body {
+  font-family: var(--font-body);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
+h1,
+h2 {
+  letter-spacing: -0.02em;
+}
+
+code,
+kbd,
+pre,
+samp {
+  font-family: var(--rx-font-mono);
+}
+
+/* ============================================================
+   4) BARRA LATERAL — sempre navy, texto claro, acento dourado ativo
+   ============================================================
+   `components/shell/Sidebar.tsx` NÃO é editado. O `<aside>` do componente
+   tem as classes Tailwind `sticky ... bg-card`; `aside.bg-card` casa só ele
+   (é o único elemento com essa combinação na árvore). Dentro, os itens de
+   nav usam classes utilitárias (`bg-accent`, `text-accent-foreground`,
+   `text-muted-foreground`, `hover:bg-accent/50`) e o atributo semântico
+   `aria-current="page"` no item ativo — esse atributo é o gancho estável
+   usado aqui em vez de tentar casar a classe `bg-accent` (que também pinta
+   botões primários fora da sidebar, e não deve mudar de cor lá fora). */
+aside.bg-card {
+  background: linear-gradient(185deg, #1f1b7e 0%, #17124f 55%, #100d38 100%);
+  border-right-color: rgba(255, 255, 255, 0.12);
+  color: rgba(226, 234, 248, 0.82);
+}
+aside.bg-card * {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+/* Cabeçalho da marca / rótulos secundários / footer */
+aside.bg-card .text-muted-foreground,
+aside.bg-card .text-text-subtle {
+  color: rgba(226, 234, 248, 0.62) !important;
+}
+aside.bg-card .text-foreground,
+aside.bg-card span.font-semibold {
+  color: #ffffff !important;
+}
+aside.bg-card .text-primary {
+  color: var(--rx-gold) !important;
+}
+
+/* Ícones e texto padrão dos itens de navegação (estado normal) */
+aside.bg-card nav a,
+aside.bg-card nav button,
+aside.bg-card .border-t a,
+aside.bg-card .border-t button {
+  color: rgba(226, 234, 248, 0.78);
+}
+
+/* Hover — mesmo filete sutil branco do portal */
+aside.bg-card nav a:hover,
+aside.bg-card nav button:hover,
+aside.bg-card .border-t a:hover,
+aside.bg-card .border-t button:hover {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+  color: #ffffff !important;
+}
+
+/* Ativo — fundo translúcido branco + borda dourada à esquerda (padrão do
+   portal: `box-shadow: inset 3px 0 0 var(--cx-cyan)`, aqui dourado) */
+aside.bg-card nav a[aria-current="page"],
+aside.bg-card .border-t a[aria-current="page"] {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  color: #ffffff !important;
+  box-shadow: inset 3px 0 0 var(--rx-gold);
+}
+aside.bg-card nav a[aria-current="page"] svg,
+aside.bg-card .border-t a[aria-current="page"] svg {
+  color: var(--rx-gold);
+}
+
+/* Halo dourado sutil no topo da barra — assinatura "foil" do portal */
+aside.bg-card {
+  position: relative;
+}
+aside.bg-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(115deg, #bb965c, #e6c890 45%, #c7a164 76%, #d7b477);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+/* O logo Retrix é claro (traço branco/cinza-claro sobre fundo transparente),
+   feito para pousar em fundo escuro — é a MESMA arte usada na navy do portal.
+   `Sidebar.tsx` embrulha o logo enviado num chip `dark:bg-white` (pensado
+   para o caso comum, logo ESCURO sobre sidebar escura): com a sidebar agora
+   SEMPRE navy, esse chip branco esconderia um logo claro (traço branco em
+   caixa branca). Zera o chip aqui — o logo passa a pousar direto na navy,
+   exatamente como a marca já pousa no portal. */
+/* Escopado ao cabeçalho (`border-b`, único `rounded-md` fora da nav) — sem
+   isto, `.rounded-md` também casa os PRÓPRIOS itens de navegação (mesma
+   classe de raio), e o `!important` daqui apagaria a borda dourada do item
+   ativo mais abaixo neste arquivo. Achado ao inspecionar a regra vencedora
+   via CDP `CSS.getMatchedStylesForNode` — o link ativo tinha `box-shadow:
+   none !important` vindo desta regra por colisão de seletor. */
+aside.bg-card > div.border-b .rounded-md {
+  background: transparent !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Mesmo raciocínio na fachada de acesso (`app/(public)/layout.tsx`): o chip
+   só existe em `dark:bg-white`, e no tema claro o logo (claro) fica direto
+   sobre `--color-bg` (agora quase branco) — invisível. Damos a ele uma
+   moldura navy PRÓPRIA, nos dois temas, para o logo Retrix ficar legível
+   onde quer que a fachada o desenhe. `:has()` mira o `<div>` que embrulha
+   `[data-testid="logo-da-fachada"]` sem precisar de classe nova no
+   componente. */
+div:has(> img[data-testid="logo-da-fachada"]) {
+  background: linear-gradient(135deg, #1f1b7e, #14114f) !important;
+  padding: 12px 20px !important;
+  border-radius: var(--radius-md, 10px);
+  box-shadow: none !important;
+}

@@ -24,6 +24,10 @@ import { ThemeProvider } from "@/lib/theme";
 import { Providers } from "./providers";
 import { PublicEnvScript } from "./public-env-script";
 import "./globals.css";
+// Tema visual Retrix do fork — arquivo NOVO, nunca edita globals.css (ver o
+// cabeçalho de app/retrix/tema.css para o porquê). Importado depois do CSS
+// global para vencer no empate de especificidade (mesma regra de cascata).
+import "./retrix/tema.css";
 
 const atkinson = Atkinson_Hyperlegible({
   subsets: ["latin", "latin-ext"],
