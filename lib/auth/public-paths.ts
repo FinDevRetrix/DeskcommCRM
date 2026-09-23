@@ -139,6 +139,13 @@ export const PUBLIC_PATHS: RegExp[] = [
   // endpoint, nenhum sub-path futuro sob `/api/retrix/` nasce público de
   // carona.
   /^\/api\/retrix\/sso$/,
+  // `POST /api/retrix/clientes` recebe os clientes do Conta Azul, uma vez
+  // por dia, da Edge Function do Portal — nunca de um navegador com cookie
+  // nosso. A auth de verdade (Bearer fixo, tempo constante) mora DENTRO da
+  // rota (`app/api/retrix/clientes/route.ts`), igual à linha acima e a
+  // `/api/v1/system/agent`. Ancorado com `$`: só este endpoint, nenhum
+  // sub-path futuro sob `/api/retrix/` nasce público de carona.
+  /^\/api\/retrix\/clientes$/,
 ];
 
 export function isPublicPath(pathname: string): boolean {

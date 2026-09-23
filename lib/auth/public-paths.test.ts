@@ -65,4 +65,17 @@ describe("isPublicPath", () => {
     expect(isPublicPath("/api/retrix/sso/qualquer")).toBe(false);
     expect(isPublicPath("/api/retrix")).toBe(false);
   });
+
+  /**
+   * Sincronização de clientes do Conta Azul (`lib/retrix/clientes.ts`) — a
+   * Edge Function do Portal chama esta rota sem cookie de sessão nossa, por
+   * definição (é um Bearer fixo, verificado DENTRO da rota).
+   */
+  it("libera a rota de sincronização de clientes Retrix", () => {
+    expect(isPublicPath("/api/retrix/clientes")).toBe(true);
+  });
+
+  it("a âncora `$` de /api/retrix/clientes impede sub-path de carona", () => {
+    expect(isPublicPath("/api/retrix/clientes/qualquer")).toBe(false);
+  });
 });
