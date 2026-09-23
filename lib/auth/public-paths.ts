@@ -121,6 +121,24 @@ export const PUBLIC_PATHS: RegExp[] = [
   // dois nomes de propósito: `/^\/legal/` deixaria qualquer sub-path futuro
   // nascer público de carona.
   /^\/legal\/(terms|privacy)$/,
+  // PONTE DE LOGIN COM O PORTAL CENTRAL RETRIX (fork Retrix — lib/retrix/).
+  // Quem chega em `/retrix/entrar` é a aba que o PORTAL acabou de abrir com
+  // `window.open`: nunca tem, e não pode ter, cookie de sessão nossa — a
+  // sessão é o que essa tela existe para conseguir. Sem esta linha o `proxy`
+  // manda a pessoa para `/login` ANTES do handshake `postMessage` rodar, e a
+  // ponte nunca fecha. Mesma classe de entrada que `/auth/callback` e as
+  // voltas de OAuth acima: identidade vem de um token validado DENTRO da
+  // rota, nunca do cookie.
+  /^\/retrix\/entrar$/,
+  // `POST /api/retrix/sso` fecha o handshake: recebe o access_token do
+  // Portal e É ELE que cria a sessão do CRM — não pode exigir a sessão que
+  // ainda não existe. A auth de verdade mora DENTRO da rota (origem do
+  // pedido, token verificado contra o Supabase do Portal, aal2, domínio —
+  // ver `app/api/retrix/sso/route.ts`), igual a `/api/v1/system/agent` e
+  // `/api/v1/tenants/provision` acima. Ancorado com `$`: só este único
+  // endpoint, nenhum sub-path futuro sob `/api/retrix/` nasce público de
+  // carona.
+  /^\/api\/retrix\/sso$/,
 ];
 
 export function isPublicPath(pathname: string): boolean {

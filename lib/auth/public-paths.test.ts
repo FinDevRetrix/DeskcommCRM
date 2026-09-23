@@ -48,4 +48,21 @@ describe("isPublicPath", () => {
     expect(isPublicPath("/legal/terms/interno")).toBe(false);
     expect(isPublicPath("/legal/qualquer-outra")).toBe(false);
   });
+
+  /**
+   * Ponte de login com o Portal Central Retrix (`lib/retrix/`). As duas rotas
+   * nunca têm cookie de sessão nossa por definição — é o handshake delas que
+   * cria a sessão — e a auth de verdade mora DENTRO de cada uma.
+   */
+  it("libera a tela e a rota da ponte de login Retrix", () => {
+    expect(isPublicPath("/retrix/entrar")).toBe(true);
+    expect(isPublicPath("/api/retrix/sso")).toBe(true);
+  });
+
+  it("a âncora `$` das duas rotas Retrix impede sub-path de carona", () => {
+    expect(isPublicPath("/retrix/entrar/qualquer")).toBe(false);
+    expect(isPublicPath("/retrix")).toBe(false);
+    expect(isPublicPath("/api/retrix/sso/qualquer")).toBe(false);
+    expect(isPublicPath("/api/retrix")).toBe(false);
+  });
 });
